@@ -109,6 +109,8 @@ async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Set up the conversation entity from a config entry."""
+    if entry.title != "Closest Intent Danish":
+        hass.config_entries.async_update_entry(entry, title="Closest Intent Danish")
     hass.data.setdefault(DOMAIN, {})[entry.entry_id] = entry
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
     return True

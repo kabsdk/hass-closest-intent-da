@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "closest-intent-danish"
-version = "1.0.1"
+version = "1.0.2"
 description = "Danish-focused fuzzy intent matcher for Home Assistant."
 readme = "README.md"
 license = { text = "AGPL-3.0" }
