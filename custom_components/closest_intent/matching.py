@@ -26,10 +26,44 @@ except ImportError:  # pragma: no cover
 
 _LOGGER = logging.getLogger(__name__)
 
-_SLOT_RE = re.compile(r"\{([a-zA-Z_][a-zA-Z0-9_]*)(?::[a-zA-Z_][a-zA-Z0-9_]*)?\}")
-_RULE_RE = re.compile(r"<([a-zA-Z_][a-zA-Z0-9_]*)>")
+# Python's ``\w`` is Unicode-aware; the first character must not be a digit.
+_HASSIL_IDENTIFIER = r"[^\W\d]\w*"
+_SLOT_RE = re.compile(rf"\{{({_HASSIL_IDENTIFIER})(?::{_HASSIL_IDENTIFIER})?\}}")
+_RULE_RE = re.compile(rf"<({_HASSIL_IDENTIFIER})>")
 _ALT_RE = re.compile(r"\(([^()]+)\)")
-_OPT_RE = re.compile(r"\[([^\[\]]+)\]")
+_OPT_RE = re.compile(r"\[([^\[\]]*)\]")
+
+_DELIMITER_PAIRS = {"(": ")", "[": "]", "<": ">", "{": "}"}
+_CLOSING_DELIMITERS = set(_DELIMITER_PAIRS.values())
+
+
+def _split_top_level_alternatives(expression: str) -> list[str]:
+    """Split ``expression`` on unescaped ``|`` characters outside nested syntax."""
+    alternatives: list[str] = []
+    delimiter_stack: list[str] = []
+    start = 0
+    escaped = False
+
+    for index, char in enumerate(expression):
+        if escaped:
+            escaped = False
+            continue
+        if char == "\\":
+            escaped = True
+            continue
+
+        closing = _DELIMITER_PAIRS.get(char)
+        if closing is not None:
+            delimiter_stack.append(closing)
+        elif char in _CLOSING_DELIMITERS:
+            if delimiter_stack and char == delimiter_stack[-1]:
+                delimiter_stack.pop()
+        elif char == "|" and not delimiter_stack:
+            alternatives.append(expression[start:index])
+            start = index + 1
+
+    alternatives.append(expression[start:])
+    return alternatives
 
 
 @dataclass
@@ -144,7 +178,7 @@ class Candidate:
         return bool(self.slot_names)
 
 
-_INNER_SLOT_RE = re.compile(r"\x00slot:([a-zA-Z_][a-zA-Z0-9_]*)\x00")
+_INNER_SLOT_RE = re.compile(rf"\x00slot:({_HASSIL_IDENTIFIER})\x00")
 
 
 def _inner_slot_marker(slot_name: str) -> str:
@@ -168,7 +202,7 @@ def expand_pattern(
         pattern = resolver.inline_rules(pattern)
 
     def _slot_sub(m: re.Match[str]) -> str:
-        return f" {_inner_slot_marker(m.group(1))} "
+        return _inner_slot_marker(m.group(1))
 
     pat = _SLOT_RE.sub(_slot_sub, pattern)
 
@@ -179,38 +213,65 @@ def expand_pattern(
         return _normalise(v_canonical), _normalise_keepcase(v_canonical), variant_slot_names
 
     if cap == 0:
-        text = _ALT_RE.sub(lambda m: m.group(1).split("|")[0], pat)
-        text = _OPT_RE.sub(lambda m: m.group(1).split("|")[0], text)
-        return [_finalise(text)]
-
-    variants: list[str] = [pat]
-    while True:
-        new_variants: list[str] = []
-        changed = False
-        for v in variants:
-            m_alt = _ALT_RE.search(v)
-            m_opt = _OPT_RE.search(v)
+        text = pat
+        while True:
+            m_alt = _ALT_RE.search(text)
+            m_opt = _OPT_RE.search(text)
+            chosen: re.Match[str] | None
             if m_alt and m_opt:
                 chosen = m_alt if m_alt.start() < m_opt.start() else m_opt
             else:
                 chosen = m_alt or m_opt
             if chosen is None:
-                new_variants.append(v)
-                continue
-            changed = True
-            before, after = v[: chosen.start()], v[chosen.end() :]
-
-            # ``[a|b]`` is semantically equivalent to ``(|a|b)``
-            opts = chosen.group(1).split("|")
-            if chosen is m_opt:
-                opts = ["", *opts]
-            for o in opts:
-                new_variants.append(before + o + after)
-            if len(new_variants) >= cap:
                 break
-        variants = new_variants[:cap]
-        if not changed:
-            break
+            first = _split_top_level_alternatives(chosen.group(1))[0]
+            text = text[: chosen.start()] + first + text[chosen.end() :]
+        return [_finalise(text)]
+
+    def _expand_variants(source: str, *, skip_optionals: bool) -> list[str]:
+        variants = [source]
+        while True:
+            new_variants: list[str] = []
+            changed = False
+            for variant in variants:
+                m_alt = _ALT_RE.search(variant)
+                m_opt = _OPT_RE.search(variant)
+                chosen: re.Match[str] | None
+                if m_alt and m_opt:
+                    chosen = m_alt if m_alt.start() < m_opt.start() else m_opt
+                else:
+                    chosen = m_alt or m_opt
+                if chosen is None:
+                    new_variants.append(variant)
+                    continue
+                changed = True
+                before, after = variant[: chosen.start()], variant[chosen.end() :]
+
+                opts = _split_top_level_alternatives(chosen.group(1))
+                if chosen is m_opt:
+                    # ``[a|b]`` is semantically equivalent to ``(|a|b)``.
+                    opts = [""] if skip_optionals else ["", *opts]
+                for option in opts:
+                    new_variants.append(before + option + after)
+                if len(new_variants) >= cap:
+                    break
+            variants = new_variants[:cap]
+            if not changed:
+                return variants
+
+    # Reserve the first forms for required alternatives with optionals omitted.
+    # Otherwise, optional modifiers/suffixes near the start of a built-in pattern
+    # can fill the cap before a later required alternative is ever represented.
+    variants = _expand_variants(pat, skip_optionals=True)
+    if len(variants) < cap:
+        seen_variants = set(variants)
+        for variant in _expand_variants(pat, skip_optionals=False):
+            if variant in seen_variants:
+                continue
+            seen_variants.add(variant)
+            variants.append(variant)
+            if len(variants) >= cap:
+                break
 
     out = []
     seen: set[str] = set()
@@ -286,9 +347,13 @@ def _slot_credit(slot_text: str, slot_name: str | None, resolver: Resolver | Non
         return 0
     if resolver is None or not slot_name:
         return 100
-    values = resolver.slot_values.get(slot_name)
-    if not values:
+    if slot_name not in resolver.slot_values:
+        # Unknown lists may be Hassil wildcards, so retain the existing catch-all behavior.
         return 100
+    values = resolver.slot_values[slot_name]
+    if not values:
+        # A known enumerable list with no values cannot match arbitrary text.
+        return 0
     best = 0
     for v in values:
         r = int(fuzz.ratio(slot_text, _normalise(v)))

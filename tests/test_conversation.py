@@ -36,6 +36,7 @@ from const import (  # type: ignore  # noqa: E402
     KEY_CONVERSATION_EXPANSION_RULES,
     KEY_CONVERSATION_INTENTS,
     KEY_CONVERSATION_LISTS,
+    SLOT_WILDCARD,
 )
 from conversation import ClosestIntentAgent  # type: ignore  # noqa: E402
 
@@ -357,6 +358,26 @@ async def test_registry_change_triggers_rebuild(hass, _capture_async_converse):
 
 
 @pytest.mark.asyncio
+async def test_collect_preserves_empty_dynamic_enumerable_list(hass, monkeypatch):
+    class _DefaultAgent:
+        async def async_get_or_load_intents(self, language):
+            return SimpleNamespace(intents_dict={})
+
+        async def _make_slot_lists(self):
+            return {
+                "floor": SimpleNamespace(values=[]),
+                "wildcard": SimpleNamespace(),
+            }
+
+    agent = _make_agent(hass, startup_self_check=False)
+    monkeypatch.setattr(agent, "_find_default_agent", lambda: _DefaultAgent())
+
+    slot_lists, _, _, _ = await agent._async_collect_ha_intents_data("de")
+    assert slot_lists["floor"] == []
+    assert "wildcard" not in slot_lists
+
+
+@pytest.mark.asyncio
 async def test_per_language_pools(hass, _capture_async_converse):
     """Different ``user_input.language`` values must yield independent pools."""
     hass.data.setdefault(DOMAIN, {})[KEY_CONVERSATION_INTENTS] = {
@@ -477,6 +498,77 @@ async def test_builtin_allowlist_picks_specific_intents(hass, _capture_async_con
     _, _, builtin_candidates = agent._pools["de"]
     seen_intents = {c.intent for c in builtin_candidates}
     assert seen_intents == {"HassTurnOn", "HassGetWeather"}
+
+
+@pytest.mark.parametrize("spoken", ["tynd lyset på kontoret", "tænd lyset på kontoret"])
+@pytest.mark.asyncio
+async def test_danish_builtin_turn_on_resolves_area(
+    hass, _capture_async_converse, monkeypatch, spoken
+):
+    rules = {
+        "etage": "{floor}[(n|en)][s]",
+        "i_på": "(i | på)",
+        "lys": "(lys[et|ene] | lyskilde[n|r|rne] | pære[n|r|rne] | lampe[n|r|rne])[s]",
+        "område": "{area}[(en|et|n|t)][s]",
+        "tænd": "tænd [for]",
+    }
+    builtin_intents = {
+        "HassTurnOn": [
+            "<tænd> <lys> <i_på> <område>",
+            "<tænd> <lys> <i_på> <etage>",
+        ]
+    }
+
+    async def _fake_collect(self, language):
+        return ({"area": ["Kontor"], "floor": []}, rules, {}, builtin_intents)
+
+    monkeypatch.setattr(ClosestIntentAgent, "_async_collect_ha_intents_data", _fake_collect)
+    hass.config.language = "da"
+    agent = _make_agent(hass, threshold=70, include_builtins=True, startup_self_check=False)
+    await agent.async_added_to_hass()
+
+    resolver, user_candidates, builtin_candidates = agent._pools["da"]
+    identical_surfaces = {
+        tuple(candidate.slot_names)
+        for candidate in builtin_candidates
+        if candidate.text == f"tænd lys på {SLOT_WILDCARD}"
+    }
+    assert identical_surfaces == {("area",), ("floor",)}
+
+    detail, pool_name = agent._match_in_pools(spoken, resolver, user_candidates, builtin_candidates)
+    assert detail is not None
+    candidate, captured, _, canonical = detail
+    assert pool_name == "builtin"
+    assert candidate.intent == "HassTurnOn"
+    assert candidate.slot_names == ["area"]
+    assert captured == ["kontoret"]
+    assert canonical == "tænd lys på Kontor"
+    assert all(token not in canonical for token in ("<", ">", "[", "]"))
+
+    from hassil import Intents, TextSlotList, recognize_best
+
+    hassil_intents = Intents.from_dict(
+        {
+            "language": "da",
+            "intents": {"HassTurnOn": {"data": [{"sentences": builtin_intents["HassTurnOn"]}]}},
+            "expansion_rules": rules,
+        }
+    )
+    hassil_result = recognize_best(
+        canonical,
+        hassil_intents,
+        slot_lists={
+            "area": TextSlotList.from_strings(["Kontor"]),
+            "floor": TextSlotList.from_strings([]),
+        },
+        language="da",
+    )
+    assert hassil_result is not None
+    assert hassil_result.intent.name == "HassTurnOn"
+    assert hassil_result.entities["area"].value == "Kontor"
+
+    await agent.async_process(_conversation_input(spoken, language="da"))
+    assert _capture_async_converse["text"] == canonical
 
 
 @pytest.mark.asyncio

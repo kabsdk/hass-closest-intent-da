@@ -15,6 +15,7 @@ from const import SLOT_WILDCARD  # type: ignore  # noqa: E402
 from matching import (  # type: ignore  # noqa: E402
     Candidate,
     Resolver,
+    _split_top_level_alternatives,
     build_canonical,
     expand_pattern,
     extract_slots,
@@ -59,6 +60,36 @@ def test_expand_combined() -> None:
     texts = {t for (t, _, _) in expand_pattern("(Schalte|Mache) [die ]Pumpe an", cap=16)}
     assert "schalte pumpe an" in texts
     assert "mache die pumpe an" in texts
+
+
+def test_expand_nested_alternatives() -> None:
+    texts = {t for (t, _, _) in expand_pattern("(lys[et|ene] | lyskilde[n|r|rne])", cap=32)}
+    assert texts == {
+        "lys",
+        "lyset",
+        "lysene",
+        "lyskilde",
+        "lyskilden",
+        "lyskilder",
+        "lyskilderne",
+    }
+    assert texts.isdisjoint({"lys et", "ene", "r", "rne"})
+
+
+def test_split_alternatives_respects_all_hassil_delimiters() -> None:
+    assert _split_top_level_alternatives("a|(b|c)|[d|e]|<f|g>|{h|i}") == [
+        "a",
+        "(b|c)",
+        "[d|e]",
+        "<f|g>",
+        "{h|i}",
+    ]
+
+
+def test_expand_nested_optionals_removes_empty_outer_syntax() -> None:
+    texts = {text for text, _, _ in expand_pattern("ga [[in|på]] kontoret", cap=16)}
+    assert texts == {"ga kontoret", "ga in kontoret", "ga på kontoret"}
+    assert expand_pattern("ga [[in|på]] kontoret", cap=0)[0][0] == "ga in kontoret"
 
 
 def test_expand_cap_zero_disables_expansion() -> None:
@@ -143,6 +174,12 @@ def test_score_slot_pattern_with_typo_in_fixed_parts() -> None:
 def test_score_slot_pattern_with_typo_in_slot_value() -> None:
     cand = f"test drei mit {SLOT_WILDCARD}"
     assert score("test drei mit chrlotte", cand) >= 80
+
+
+def test_score_rejects_slot_with_known_empty_value_list() -> None:
+    cand = f"tænd lys på {SLOT_WILDCARD}"
+    resolver = Resolver(slot_values={"floor": []})
+    assert score("tænd lys på kontoret", cand, resolver, ["floor"]) < 70
 
 
 def test_score_slot_pattern_rejects_unrelated() -> None:
@@ -408,6 +445,24 @@ def test_resolver_inlines_recursively() -> None:
     assert out == "((hier|dort) da|anders)"
 
 
+def test_resolver_inlines_unicode_rule_names_recursively() -> None:
+    r = Resolver(
+        expansion_rules={
+            "command": ["<tænd> <i_på> <område>"],
+            "tænd": ["tænd [for]"],
+            "i_på": ["(i|på)"],
+            "område": ["{area}"],
+        }
+    )
+    out = expand_pattern("<command>", cap=16, resolver=r)
+    texts = {text for text, _, _ in out}
+
+    assert f"tænd i {SLOT_WILDCARD}" in texts
+    assert f"tænd for på {SLOT_WILDCARD}" in texts
+    assert all(slots == ["area"] for _, _, slots in out)
+    assert all("<" not in display and ">" not in display for _, display, _ in out)
+
+
 def test_resolver_inlines_unknown_rule_as_wildcard_slot() -> None:
     """Unknown rules must fall back to a {slot} wildcard."""
     r = Resolver()
@@ -432,6 +487,35 @@ def test_expand_pattern_uses_resolver_rules() -> None:
     texts = [t for (t, _, _) in out]
     assert "hallo closest_intent" in texts
     assert "moin closest_intent" in texts
+
+
+def test_expand_combined_danish_style_rules() -> None:
+    r = Resolver(
+        expansion_rules={
+            "tænd": ["tænd [for]"],
+            "lys": ["(lys[et|ene] | lyskilde[n|r|rne])[s]"],
+            "i_på": ["(i | på)"],
+            "område": ["{area}[(en|et|n|t)][s]"],
+        },
+        slot_values={"area": ["Kontor"]},
+    )
+    out = expand_pattern("<tænd> <lys> <i_på> <område>", cap=512, resolver=r)
+    texts = {text for text, _, _ in out}
+
+    assert f"tænd lyset på {SLOT_WILDCARD}et" in texts
+    assert f"tænd lyskilderne i {SLOT_WILDCARD}" in texts
+    assert all(slots == ["area"] for _, _, slots in out)
+    assert all(
+        token not in display
+        for _, display, _ in out
+        for token in ("<tænd>", "<lys>", "<i_på>", "<område>", "[et")
+    )
+
+    text, display, slots = next(
+        form for form in out if form[0] == f"tænd lyset på {SLOT_WILDCARD}et"
+    )
+    candidate = Candidate("HassTurnOn", 0, text, display, slots)
+    assert build_canonical(candidate, ["Kontor"], resolver=r) == "tænd lyset på Kontoret"
 
 
 def test_resolver_resolves_exact_match() -> None:

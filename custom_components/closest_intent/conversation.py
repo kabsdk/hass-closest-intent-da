@@ -386,7 +386,7 @@ class ClosestIntentAgent(conversation.ConversationEntity):
         stash = self.hass.data.get(DOMAIN, {})
         for name, raw_def in (stash.get(KEY_CONVERSATION_LISTS) or {}).items():
             values = _parse_raw_list_values(raw_def)
-            if values:
+            if values or _is_empty_enumerable_list(raw_def):
                 slot_lists[name] = values
         for name, body in (stash.get(KEY_CONVERSATION_EXPANSION_RULES) or {}).items():
             if isinstance(body, str) and body:
@@ -423,7 +423,7 @@ class ClosestIntentAgent(conversation.ConversationEntity):
                 rules[name] = body
         for name, raw_def in (intents_dict.get("lists") or {}).items():
             values = _parse_raw_list_values(raw_def)
-            if values:
+            if values or _is_empty_enumerable_list(raw_def):
                 slot_lists[name] = values
 
         # Dynamic lists: declared `wildcard: true` in intents_dict, computed at recognition time.
@@ -437,7 +437,9 @@ class ClosestIntentAgent(conversation.ConversationEntity):
             if name in slot_lists:
                 continue
             values = _extract_text_slot_values(slot_list)
-            if values:
+            # Dynamic area/name/floor lists are Hassil TextSlotLists. Preserve an
+            # empty one so it cannot act like an unconstrained wildcard later.
+            if values or getattr(slot_list, "values", None) is not None:
                 slot_lists[name] = sorted(set(values))
 
         builtin_names = await self.hass.async_add_executor_job(self._builtin_intent_names, language)
@@ -531,7 +533,7 @@ class ClosestIntentAgent(conversation.ConversationEntity):
                 continue
 
             # Dedupe across patterns within this intent.
-            seen_texts: set[str] = set()
+            seen_candidates: set[tuple[str, tuple[str, ...]]] = set()
             kept = 0
             depth = 0
             while kept < PER_INTENT_CANDIDATE_CAP:
@@ -541,9 +543,10 @@ class ClosestIntentAgent(conversation.ConversationEntity):
                         continue
                     text, display_text, slot_names = forms[depth]
                     progress = True
-                    if text in seen_texts:
+                    candidate_key = (text, tuple(slot_names))
+                    if candidate_key in seen_candidates:
                         continue
-                    seen_texts.add(text)
+                    seen_candidates.add(candidate_key)
                     candidates.append(
                         Candidate(
                             intent=intent_name,
@@ -580,8 +583,7 @@ class ClosestIntentAgent(conversation.ConversationEntity):
         """Build a Resolver from HA's authoritative vocabulary."""
         resolver = Resolver()
         for name, values in ha_slot_lists.items():
-            if values:
-                resolver.slot_values[name] = values
+            resolver.slot_values[name] = values
         for name, body in ha_expansion_rules.items():
             if body:
                 resolver.expansion_rules[name] = [body]
@@ -1225,6 +1227,15 @@ def _format_clashes(clashes: list[dict]) -> str:
         sections.append("\n".join(lines))
 
     return "\n\n".join(sections)
+
+
+def _is_empty_enumerable_list(raw_def) -> bool:
+    """Return whether ``raw_def`` declares a constrained list with no values."""
+    return (
+        isinstance(raw_def, dict)
+        and not raw_def.get("wildcard")
+        and ("values" in raw_def or "range" in raw_def)
+    )
 
 
 def _parse_raw_list_values(raw_def) -> list[str]:

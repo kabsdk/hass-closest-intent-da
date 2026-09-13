@@ -21,6 +21,7 @@
             rapidfuzz
             voluptuous
             # Test
+            hassil
             pytest
             pytest-asyncio
             pyyaml
