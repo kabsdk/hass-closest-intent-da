@@ -3,13 +3,13 @@ requires = ["setuptools>=64"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "closest_intent"
-version = "0.2.1"
-description = "Fuzzy intent matcher for HomeAssistant. Garbled STT output in, actual intent out."
+name = "closest-intent-danish"
+version = "1.0.1"
+description = "Danish-focused fuzzy intent matcher for Home Assistant."
 readme = "README.md"
 license = { text = "AGPL-3.0" }
 requires-python = ">=3.11"
-authors = [{ name = "Charlotte Hartmann Paludo" }]
+authors = [{ name = "Kristian Slot" }]
 dependencies = ["rapidfuzz>=3.5.0"]
 
 [project.optional-dependencies]
@@ -20,11 +20,11 @@ test = [
   "pyyaml>=6",
   "voluptuous>=0.13",
 ]
-dev = ["closest_intent[test]", "ruff>=0.6", "mypy>=1.8"]
+dev = ["closest-intent-danish[test]", "ruff>=0.6", "mypy>=1.8"]
 
 [project.urls]
-Homepage = "https://github.com/charludo/hass-closest-intent"
-Issues = "https://github.com/charludo/hass-closest-intent/issues"
+Homepage = "https://github.com/kabsdk/hass-closest-intent-da"
+Issues = "https://github.com/kabsdk/hass-closest-intent-da/issues"
 
 [tool.setuptools]
 packages = []

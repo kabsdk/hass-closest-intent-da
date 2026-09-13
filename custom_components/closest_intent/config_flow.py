@@ -198,7 +198,7 @@ class ClosestIntentConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         """
         await self.async_set_unique_id(DOMAIN)
         self._abort_if_unique_id_configured(updates=import_data)
-        return self.async_create_entry(title="Closest Intent", data=import_data)
+        return self.async_create_entry(title="Closest Intent Danish", data=import_data)
 
     async def async_step_user(self, user_input: dict[str, Any] | None = None) -> Any:
         """UI setup. Single step. Same fields as options flow."""
@@ -207,7 +207,7 @@ class ClosestIntentConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
 
         if user_input is not None:
             return self.async_create_entry(
-                title="Closest Intent",
+                title="Closest Intent Danish",
                 data=_normalise(user_input),
             )
 

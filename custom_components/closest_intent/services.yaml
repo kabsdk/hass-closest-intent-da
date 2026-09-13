@@ -1,7 +1,7 @@
 dump_candidates:
   name: Dump candidates
   description: >-
-    Log the current candidate pool, expansion rules, and slot lists for every loaded Closest Intent agent.
+    Log the current candidate pool, expansion rules, and slot lists for every loaded Closest Intent Danish agent.
   fields:
     include_builtins:
       name: Include built-in intents
@@ -31,7 +31,7 @@ dump_candidates:
 parse_sentence:
   name: Parse sentence
   description: >-
-    Run a sentence through the Closest Intent matcher and return what it would match.
+    Run a sentence through the Closest Intent Danish matcher and return what it would match.
   fields:
     sentence:
       name: Sentence
@@ -47,7 +47,7 @@ parse_sentence:
       selector:
         language:
     entry_id:
-      name: Closest Intent agent
+      name: Closest Intent Danish agent
       description: Defaults to the first loaded agent.
       required: false
       selector:

@@ -153,7 +153,7 @@ async def _async_update_listener(hass: HomeAssistant, entry: ConfigEntry) -> Non
 
 class ClosestIntentAgent(conversation.ConversationEntity):
     _attr_has_entity_name = True
-    _attr_name = "Closest Intent"
+    _attr_name = "Closest Intent Danish"
     _attr_supported_features = conversation.ConversationEntityFeature.CONTROL
 
     def __init__(

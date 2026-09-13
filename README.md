@@ -1,20 +1,27 @@
 <div align="center">
-  <img src="https://raw.githubusercontent.com/charludo/hass-closest-intent/refs/heads/main/custom_components/closest_intent/brand/logo.png" alt="hass-closest-intent" height="512px"/>
-  <h1>hass-closest-intent</h1>
+  <img src="https://raw.githubusercontent.com/kabsdk/hass-closest-intent-da/refs/heads/main/custom_components/closest_intent/brand/logo.png" alt="Closest Intent Danish" height="512px"/>
+  <h1>Closest Intent Danish</h1>
 </div>
 
 <p align="center">
-	Fuzzy intent matcher for HomeAssistant.<br/>Garbled STT output in, actual intent out.
+	Danish-focused fuzzy intent matcher for Home Assistant.<br/>Garbled STT output in, actual intent out.
 </p>
 
 <p align="center">
-	<a href="https://github.com/charludo/hass-closest-intent/stargazers">
-		<img alt="Stars" src="https://img.shields.io/github/stars/charludo/hass-closest-intent?style=for-the-badge&logo=starship&color=F3B562&logoColor=D9E0EE&labelColor=302D41"></a>
-	<a href="https://github.com/charludo/hass-closest-intent/issues">
-		<img alt="Issues" src="https://img.shields.io/github/issues/charludo/hass-closest-intent?style=for-the-badge&logo=bilibili&color=F06060&logoColor=D9E0EE&labelColor=302D41"></a>
-	<a href="https://github.com/charludo/hass-closest-intent">
-		<img alt="Size" src="https://img.shields.io/github/actions/workflow/status/charludo/hass-closest-intent/nix.yml?color=8CBEB2&label=TESTS&logo=githubactions&style=for-the-badge&logoColor=D9E0EE&labelColor=302D41"/></a>
+	<a href="https://github.com/kabsdk/hass-closest-intent-da/stargazers">
+		<img alt="Stars" src="https://img.shields.io/github/stars/kabsdk/hass-closest-intent-da?style=for-the-badge&logo=starship&color=F3B562&logoColor=D9E0EE&labelColor=302D41"></a>
+	<a href="https://github.com/kabsdk/hass-closest-intent-da/issues">
+		<img alt="Issues" src="https://img.shields.io/github/issues/kabsdk/hass-closest-intent-da?style=for-the-badge&logo=bilibili&color=F06060&logoColor=D9E0EE&labelColor=302D41"></a>
+	<a href="https://github.com/kabsdk/hass-closest-intent-da/actions/workflows/nix.yml">
+		<img alt="Tests" src="https://img.shields.io/github/actions/workflow/status/kabsdk/hass-closest-intent-da/nix.yml?branch=main&style=for-the-badge&logo=githubactions&labelColor=302D41"/></a>
 </p>
+
+> [!IMPORTANT]
+> **FORK NOTICE:** **Closest Intent Danish** is a fork of
+> [hass-closest-intent](https://github.com/charludo/hass-closest-intent), originally created by
+> [Charludo](https://github.com/charludo). This fork is maintained by
+> [Kristian Slot](https://github.com/kabsdk). Credit for the original project and its design belongs
+> to Charludo and the upstream contributors.
 
 &#160;
 
@@ -34,7 +41,7 @@ So will, for that matter, "lighrts on inn livainriomm".
 
 Short demo, first with `closest-intent`, then with bare Hassil:
 
-<img src="https://raw.githubusercontent.com/charludo/hass-closest-intent/refs/heads/main/custom_components/closest_intent/brand/demo.gif" alt="demo gif" width="360"/>
+<img src="https://raw.githubusercontent.com/kabsdk/hass-closest-intent-da/refs/heads/main/custom_components/closest_intent/brand/demo.gif" alt="demo gif" width="360"/>
 
 &#160;
 
@@ -48,7 +55,9 @@ Short demo, first with `closest-intent`, then with bare Hassil:
 - Fallback agent support. OK, I said 100% LLM-free, but if you absolutely want to, you can use one as fallback. More on this below.
 - Is fast :) (as in: basically instant for a couple hundred configured custom intents).
 
-> **Note:** `closest-intent` is completely language-agnostic. All the examples in this `README` are in English, but you can use it with any language you like; personally, I use it in German.
+> **Note:** The matcher remains language-agnostic, while this fork focuses on Danish support. The
+> English examples below are retained from the upstream README; first-person commentary in them
+> refers to the original author, Charludo.
 
 &#160;
 
@@ -60,7 +69,7 @@ Here's some examples of things I said, what my STT (`wyoming-faster-whisper-base
 > I'm a native German speaker, and so I do have an accent, but this pretty closely matches my experience when using the German-language version of whisper.
 > The "bare Hassil" responses are what I got after 1:1 pasting the STT output into the voice assist chat window with `closest-intent` disabled.
 
-| what was said | STT output | with Closest Intent | bare Hassil |
+| what was said | STT output | with Closest Intent Danish | bare Hassil |
 | --- | --- | --- | --- |
 | `start cleaning` | `Star cleaning.` | ✅ Cleaning started. | ❌ Sorry, I couldn't understand that |
 | `stop cleaning` | `Stop clenching!` | ✅ Cleaning stopped. | ❌ Sorry, I am not aware of any device called clenching |
@@ -145,7 +154,7 @@ flowchart TB
         direction TB
         User[You]
         STT[STT]
-        CI[Closest Intent]
+        CI[Closest Intent Danish]
         Hassil[Hassil]
         HA[HomeAssistant]
         User --> STT
@@ -206,17 +215,17 @@ However, please feel free to try enabling the built-in intents first - it may ju
 #### Via HACS, custom repository
 
 1. Open HACS, click the three-dot menu (top right) -> **Custom repositories**.
-1. Paste `https://github.com/charludo/hass-closest-intent`, set **Type** to *Integration*, click **Add**.
-1. Find **Closest Intent** in the HACS list, click **Download**.
+1. Paste `https://github.com/kabsdk/hass-closest-intent-da`, set **Type** to *Integration*, click **Add**.
+1. Find **Closest Intent Danish** in the HACS list, click **Download**.
 1. Restart HomeAssistant.
-1. Search for **Closest Intent** in the HACS search bar, then install.
+1. Search for **Closest Intent Danish** in the HACS search bar, then install.
 1. Follow the config flow.
 
 &#160;
 
 ### ⚙️ Configuration
 
-The integration can be set up entirely in the UI (**Settings** -> **Devices & services** -> **Add integration** -> **Closest Intent**) or via `configuration.yaml`. Both paths accept the same options. UI options override YAML on a per-key basis, clearing them in the UI falls back to YAML.
+The integration can be set up entirely in the UI (**Settings** -> **Devices & services** -> **Add integration** -> **Closest Intent Danish**) or via `configuration.yaml`. Both paths accept the same options. UI options override YAML on a per-key basis, clearing them in the UI falls back to YAML.
 
 #### Options
 
@@ -276,7 +285,7 @@ The result is that usually, your commands will be handled by Hassil/`closest-int
 
 ### 🔍 Diagnostics
 
-`closest-intent` provides two diagnostics tools, `parse_sentence` and `dump_candidates`. Both can be called from **Settings** -> **Developer tools** -> **Actions**, then search for `Closest Intent`. They also work from automations, scripts, and `hass.services.async_call`.
+`closest-intent` provides two diagnostics tools, `parse_sentence` and `dump_candidates`. Both can be called from **Settings** -> **Developer tools** -> **Actions**, then search for `Closest Intent Danish`. They also work from automations, scripts, and `hass.services.async_call`.
 
 #### `closest_intent.parse_sentence`
 
@@ -311,9 +320,5 @@ In my humble opinion the project is already in a *very* useful state, but things
 
 If the issue is "my intent isn't in the pool / lists look wrong", also attach `closest_intent.dump_candidates` for the affected language.
 This is enough for almost every reproducer without needing your full HomeAssistant config.
-
-&#160;
-
-<a href="https://www.buymeacoffee.com/charludo" target="_blank"><img src="https://cdn.buymeacoffee.com/buttons/v2/default-violet.png" alt="Buy Me a Coffee" style="height: 60px !important;width: 217px !important;" ></a>
 
 &#160;
